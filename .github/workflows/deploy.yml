@@ -1,0 +1,55 @@
+name: Test and deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch: {}   # lets you re-run a deploy from the Actions tab
+
+# Never run two deploys at once; a newer push waits for the current one to finish.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node --test
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Prepare SSH
+        env:
+          VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
+          VPS_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
+        run: |
+          install -m 700 -d ~/.ssh
+          printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          # Pin the server's host key so the connection cannot be intercepted.
+          printf '%s\n' "$VPS_HOST_KEY" > ~/.ssh/known_hosts
+
+      # The key on the server is locked to a forced command, so whatever we "run" here is
+      # ignored: the server only ever executes /usr/local/sbin/serverbuddy-deploy.
+      - name: Deploy
+        env:
+          VPS_HOST: ${{ secrets.VPS_HOST }}
+          VPS_USER: ${{ secrets.VPS_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes \
+              -o ConnectTimeout=15 "$VPS_USER@$VPS_HOST" deploy
+
+      - name: Clean up key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key

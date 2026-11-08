@@ -4,15 +4,23 @@
   --ok-bg: #e3f6ee; --info-bg: #e5edff; --medium-bg: #fbf1d3; --high-bg: #fdebd9; --critical-bg: #fde4e6;
   --radius: 12px; --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
 }
+/* Theme: follows the OS by default; data-theme="light|dark" (set by the toggle) overrides it. */
 @media (prefers-color-scheme: dark) {
-  :root {
+  :root:not([data-theme="light"]) {
     --bg: #0b0f14; --card: #121821; --card2: #18202b; --line: #232d3a; --text: #e6edf3; --muted: #8b98a9;
     --accent: #5aa2ff; --ok: #3ecf8e; --info: #6ea8fe; --medium: #f5c542; --high: #ff9f43; --critical: #ff6370;
     --ok-bg: #12301f; --info-bg: #13243f; --medium-bg: #35290a; --high-bg: #38210c; --critical-bg: #3b1519;
   }
 }
+:root[data-theme="dark"] {
+  --bg: #0b0f14; --card: #121821; --card2: #18202b; --line: #232d3a; --text: #e6edf3; --muted: #8b98a9;
+  --accent: #5aa2ff; --ok: #3ecf8e; --info: #6ea8fe; --medium: #f5c542; --high: #ff9f43; --critical: #ff6370;
+  --ok-bg: #12301f; --info-bg: #13243f; --medium-bg: #35290a; --high-bg: #38210c; --critical-bg: #3b1519;
+}
 * { box-sizing: border-box; }
 html { color-scheme: light dark; }
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }
 body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
 #app { max-width: 1280px; margin: 0 auto; padding: 16px; }
 h2 { margin: 0 0 12px; font-size: 13px; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); font-weight: 600; }

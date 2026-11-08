@@ -64,7 +64,7 @@ fi
 say "Installing files to $APP_DIR"
 mkdir -p "$APP_DIR" "$ENV_DIR" "$DATA_DIR"
 # Copy the app but never the dev data/config.
-(cd "$SRC" && tar --exclude=.git --exclude=node_modules --exclude=data --exclude=.env --exclude=.claude -cf - .) | (cd "$APP_DIR" && tar -xf -)
+(cd "$SRC" && tar --exclude=.git --exclude=node_modules --exclude=data --exclude=.env --exclude=.claude --exclude=.github -cf - .) | (cd "$APP_DIR" && tar -xf -)
 chown -R root:root "$APP_DIR"
 chmod 700 "$DATA_DIR"; chmod 700 "$ENV_DIR"
 

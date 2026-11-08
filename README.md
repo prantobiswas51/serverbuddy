@@ -33,6 +33,42 @@ journalctl -u serverbuddy -f         # logs
 
 First start only: every SSH login from the last 30 days is treated as a known source, so you are not flooded with alerts for your own history.
 
+## Push to deploy (PC → GitHub → VPS)
+
+`git push` to `main` runs the tests on GitHub, then deploys to the VPS. On the server the deploy fetches `origin/main`, re-runs the tests, installs, health-checks `/healthz`, and **rolls back to the previous commit automatically** if the new version doesn't come up healthy.
+
+The CI key is locked down: in `authorized_keys` it carries `command="sudo /usr/local/sbin/serverbuddy-deploy",restrict`, and sudoers lets that user run only that one script. A leaked CI key can trigger a deploy of your own `main` branch and nothing else (no shell, no port forwarding, no other command).
+
+**One-time setup**
+
+1. **On your PC**, make a dedicated CI key (no passphrase, used by nothing else):
+   ```powershell
+   ssh-keygen -t ed25519 -N '""' -C serverbuddy-ci -f $HOME\.ssh\serverbuddy_ci
+   ```
+2. **On the VPS**, if the code isn't there yet, clone it once, then run the setup (paste your `serverbuddy_ci.pub` line):
+   ```bash
+   git clone https://github.com/prantobiswas51/serverbuddy.git ~/serverbuddy && cd ~/serverbuddy
+   sudo bash scripts/setup-deploy.sh \
+     --repo https://github.com/prantobiswas51/serverbuddy.git \
+     --pubkey "ssh-ed25519 AAAA... serverbuddy-ci"
+   ```
+   This clones to `/opt/serverbuddy-src`, installs `/usr/local/sbin/serverbuddy-deploy`, adds the sudoers rule and the locked key, then runs the first deploy (the dashboard password is printed once).
+3. **On GitHub** add four repository secrets (Settings → Secrets and variables → Actions), or with the `gh` CLI from your PC:
+   ```powershell
+   gh secret set VPS_HOST --body "144.79.218.184"
+   gh secret set VPS_USER --body "bongomaker"
+   gh secret set VPS_SSH_KEY < $HOME\.ssh\serverbuddy_ci
+   ssh-keyscan -t ed25519 144.79.218.184 | gh secret set VPS_HOST_KEY
+   ```
+   Check that the `ssh-keyscan` fingerprint matches the one you trust: `ssh-keyscan -t ed25519 144.79.218.184 | ssh-keygen -lf -`.
+4. `git push`. Watch it in the repo's **Actions** tab. Re-run a deploy any time with *Run workflow*.
+
+**Security notes**
+
+- Anyone who can push to `main` effectively gets root on the VPS (the deploy installs and runs that code as root). Keep the repo's write access to yourself and turn on branch protection for `main`. The workflow never runs on pull requests, and secrets are not exposed to forks.
+- Logs of a deploy: the Actions run output, and `journalctl -u serverbuddy` on the server.
+- Manual deploy from the server: `sudo serverbuddy-deploy` (`FORCE=1 sudo -E serverbuddy-deploy` to redeploy the same commit).
+
 ## Open the dashboard
 
 It listens on **127.0.0.1:7070 only**. Pick one:

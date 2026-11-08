@@ -62,6 +62,19 @@
     return s;
   }
 
+  // ---- theme: light / dark, remembered in this browser; first visit follows the OS ----
+  const osDark = () => window.matchMedia('(prefers-color-scheme: dark)').matches;
+  const isDark = () => {
+    const t = document.documentElement.getAttribute('data-theme');
+    return t ? t === 'dark' : osDark();
+  };
+  function toggleTheme() {
+    const next = isDark() ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', next);
+    try { localStorage.setItem('sb_theme', next); } catch { /* ignore */ }
+    render();
+  }
+
   const bar = (pct) => h('div', { class: 'bar' }, h('i', { class: clsPct(pct), style: `width:${Math.min(100, pct).toFixed(1)}%` }));
   const kv = (k, v) => h('div', { class: 'kv' }, h('span', { class: 'muted' }, k), h('span', null, v));
 
@@ -97,6 +110,7 @@
         !s.host.root && !s.host.mock && chip('not root: limited view', 'warn'),
         s.system && h('span', { class: 'muted small' }, `up ${fmtDur(s.system.uptimeSec * 1000)}`),
         h('span', { class: 'live' }, h('span', { class: `dot ${live ? '' : 'off'}` }), live ? 'live' : 'reconnecting'),
+        h('button', { class: 'btn sm', title: 'Switch light/dark theme', 'aria-label': 'Toggle theme', onclick: toggleTheme }, isDark() ? '☀ Light' : '☾ Dark'),
         h('button', { class: 'btn sm', onclick: async () => { await fetch('/api/logout', { method: 'POST' }); showLogin(); } }, 'Log out')));
   }
 
