@@ -1,0 +1,15 @@
+{
+  "name": "serverbuddy",
+  "version": "0.1.0",
+  "description": "Single-dashboard VPS monitor: system performance, security threats and multi-user PM2 error watching. Zero dependencies.",
+  "private": true,
+  "license": "MIT",
+  "main": "src/index.js",
+  "engines": { "node": ">=20" },
+  "scripts": {
+    "start": "node src/index.js",
+    "dev": "node src/index.js --mock",
+    "hash": "node scripts/hash-password.js",
+    "test": "node --test"
+  }
+}

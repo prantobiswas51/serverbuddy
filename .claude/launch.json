@@ -1,0 +1,11 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "serverbuddy-mock",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["src/index.js", "--mock"],
+      "port": 7070
+    }
+  ]
+}
