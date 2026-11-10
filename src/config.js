@@ -31,6 +31,8 @@ module.exports = {
   // Security policy
   allowedPorts: list(process.env.SB_ALLOWED_PORTS, ['22', '80', '443']).map(Number),
   allowedLoginUsers: list(process.env.SB_ALLOWED_LOGIN_USERS, []), // empty = don't restrict by user name
+  // SHA256 fingerprints of the CI deploy key(s); install.sh fills this in from authorized_keys.
+  deployKeyFps: list(process.env.SB_DEPLOY_KEY_FPS, []),
   services: list(process.env.SB_SERVICES, ['ssh', 'nginx', 'postgresql', 'mosquitto', 'fail2ban']),
   nginxLog: process.env.SB_NGINX_LOG || '/var/log/nginx/access.log',
 

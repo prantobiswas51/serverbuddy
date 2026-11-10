@@ -14,7 +14,8 @@ const normTs = (s) => Date.parse(String(s).replace(/([+-]\d\d)(\d\d)$/, '$1:$2')
 const PFX = '^(\\S+)\\s+\\S+\\s+sshd(?:-session)?\\[\\d+\\]:\\s+';
 const reFailed = new RegExp(PFX + 'Failed (\\S+) for (invalid user )?(\\S+) from (\\S+) port \\d+');
 const reInvalid = new RegExp(PFX + 'Invalid user (\\S*) from (\\S+)');
-const reAccepted = new RegExp(PFX + 'Accepted (\\S+) for (\\S+) from (\\S+) port \\d+');
+// "Accepted publickey for bob from 1.2.3.4 port 5 ssh2: ED25519 SHA256:abc..." (key part only for publickey logins)
+const reAccepted = new RegExp(PFX + 'Accepted (\\S+) for (\\S+) from (\\S+) port \\d+(?: ssh2)?(?:: (\\S+) (\\S+))?');
 const reAuthClose = new RegExp(PFX + '(?:Connection closed by|Disconnected from) authenticating user (\\S+) (\\S+) port \\d+');
 
 /**
@@ -30,7 +31,7 @@ function parseAuth(text) {
     if (!line.includes('sshd')) continue;
     let m;
     if ((m = reAccepted.exec(line))) {
-      accepted.push({ t: normTs(m[1]), method: m[2], user: m[3], ip: m[4] });
+      accepted.push({ t: normTs(m[1]), method: m[2], user: m[3], ip: m[4], fp: m[6] || '' });
     } else if ((m = reInvalid.exec(line))) {
       attempts.push({ t: normTs(m[1]), user: m[2] || '(empty)', ip: m[3] });
     } else if ((m = reFailed.exec(line))) {
@@ -42,7 +43,9 @@ function parseAuth(text) {
   return { attempts: attempts.filter((a) => !Number.isNaN(a.t)), accepted: accepted.filter((a) => !Number.isNaN(a.t)) };
 }
 
-function aggregateAuth(parsed, now = Date.now()) {
+// deployFps: SHA256 fingerprints of the CI deploy key(s). Logins with those keys are flagged
+// `deploy: true` so GitHub's changing runner IPs don't raise "new login source" alerts.
+function aggregateAuth(parsed, now = Date.now(), deployFps = []) {
   const H = 3600e3;
   const { attempts, accepted } = parsed;
   const inWin = (a, ms) => now - a.t <= ms;
@@ -71,7 +74,7 @@ function aggregateAuth(parsed, now = Date.now()) {
     hot: [...byIp.values()].filter((e) => e.n10m >= 10).map((e) => e.ip),
     topIps,
     topUsers,
-    accepted: accepted.sort((a, b) => b.t - a.t).slice(0, 25),
+    accepted: accepted.sort((a, b) => b.t - a.t).slice(0, 25).map((a) => ({ ...a, deploy: !!a.fp && deployFps.includes(a.fp) })),
   };
 }
 
@@ -199,8 +202,8 @@ async function historicLogins() {
   return parseAuth(await readAuthText('30 days ago')).accepted;
 }
 
-function createAuth() {
-  return { async collect() { return aggregateAuth(parseAuth(await readAuthText('24 hours ago'))); } };
+function createAuth(cfg = {}) {
+  return { async collect() { return aggregateAuth(parseAuth(await readAuthText('24 hours ago')), Date.now(), cfg.deployKeyFps || []); } };
 }
 
 // Fast-changing posture data (every ~20s): ports, firewall, fail2ban, sshd config, sessions, services

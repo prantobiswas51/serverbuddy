@@ -97,6 +97,21 @@ else
   say "Keeping existing $ENV_FILE"
 fi
 
+# Learn the CI deploy key's fingerprint from authorized_keys, so its logins (from GitHub's changing
+# IP addresses) show as "deploy" on the dashboard instead of raising new-login alerts.
+FPS=""
+for ak in /home/*/.ssh/authorized_keys /root/.ssh/authorized_keys; do
+  [ -f "$ak" ] || continue
+  while IFS= read -r line; do
+    case "$line" in *'/usr/local/sbin/serverbuddy-deploy'*) ;; *) continue ;; esac
+    key="$(printf '%s\n' "$line" | sed -E 's/^.*(ssh-ed25519 [A-Za-z0-9+\/=]+).*$/\1/')"
+    tmp="$(mktemp)"; printf '%s\n' "$key" > "$tmp"
+    fp="$(ssh-keygen -lf "$tmp" 2>/dev/null | awk '{print $2}')"; rm -f "$tmp"
+    if [ -n "$fp" ]; then FPS="${FPS:+$FPS,}$fp"; fi
+  done < "$ak" || true
+done
+if [ -n "$FPS" ]; then set_env SB_DEPLOY_KEY_FPS "$FPS"; say "Deploy key fingerprint(s) registered: $FPS"; fi
+
 say "Installing systemd unit"
 cat > "$UNIT" <<EOF
 [Unit]

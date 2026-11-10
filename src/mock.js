@@ -67,6 +67,7 @@ function create() {
           ],
           topUsers: [{ user: 'root', n: 702 }, { user: 'admin', n: 301 }, { user: 'ubuntu', n: 120 }, { user: '<script>alert(1)</script>', n: 9 }],
           accepted: [
+            { t: now - 900e3, user: 'bongomaker', ip: '52.242.245.243', method: 'publickey', fp: 'SHA256:ci', deploy: true },
             { t: now - 3600e3, user: 'bongomaker', ip: '103.45.12.9', method: 'publickey' },
             { t: now - 7200e3, user: 'root', ip: '203.0.113.77', method: 'password' },
           ],

@@ -68,6 +68,27 @@ test('aggregateAuth windows and ranks sources', () => {
   assert.equal(a.accepted.length, 1);
 });
 
+test('accepted logins carry the key fingerprint; password logins have none', () => {
+  const p = sec.parseAuth([
+    '2026-11-08T14:03:00+0600 bmvps sshd-session[1]: Accepted publickey for bongomaker from 52.242.245.243 port 50000 ssh2: ED25519 SHA256:ciKeyFp',
+    '2026-11-08T14:04:00+0600 bmvps sshd-session[2]: Accepted password for root from 9.9.9.9 port 22 ssh2',
+  ].join('\n'));
+  assert.equal(p.accepted[0].fp, 'SHA256:ciKeyFp');
+  assert.equal(p.accepted[1].fp, '');
+  assert.equal(p.accepted[1].method, 'password');
+});
+
+test('aggregateAuth flags logins made with the deploy key', () => {
+  const now = Date.parse('2026-11-08T14:10:00+06:00');
+  const parsed = sec.parseAuth([
+    '2026-11-08T14:03:00+0600 bmvps sshd-session[1]: Accepted publickey for bongomaker from 52.242.245.243 port 5 ssh2: ED25519 SHA256:ciKeyFp',
+    '2026-11-08T14:04:00+0600 bmvps sshd-session[2]: Accepted publickey for bongomaker from 103.1.1.1 port 5 ssh2: ED25519 SHA256:myPersonalKey',
+  ].join('\n'));
+  const a = sec.aggregateAuth(parsed, now, ['SHA256:ciKeyFp']);
+  assert.deepEqual(a.accepted.map((x) => [x.ip, x.deploy]), [['103.1.1.1', false], ['52.242.245.243', true]]);
+  assert.equal(sec.aggregateAuth(parsed, now).accepted.every((x) => x.deploy === false), true); // no deploy keys configured
+});
+
 test('normTs handles +0600 and +06:00', () => {
   assert.equal(sec.normTs('2026-11-08T14:00:00+0600'), sec.normTs('2026-11-08T14:00:00+06:00'));
 });

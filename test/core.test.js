@@ -41,6 +41,17 @@ test('password or root logins are critical; allowedLoginUsers restricts others',
   assert.equal(a.find((x) => x.id === 'login:bob@8.8.8.8').sev, 'critical');
 });
 
+test('deploy-key logins raise no alert, but any other new login still does', () => {
+  const d = base();
+  d.auth.accepted = [
+    { user: 'bongomaker', ip: '52.242.245.243', method: 'publickey', deploy: true },
+    { user: 'bongomaker', ip: '8.8.4.4', method: 'publickey', deploy: false },
+  ];
+  const got = ids(evaluate(d, cfg));
+  assert.ok(!got.includes('login:bongomaker@52.242.245.243'));
+  assert.ok(got.includes('login:bongomaker@8.8.4.4'));
+});
+
 test('risky sshd config, open firewall, unexpected port', () => {
   const d = base();
   d.sec.sshd = { permitrootlogin: 'yes', passwordauthentication: 'yes' };

@@ -229,7 +229,7 @@
         h('div', { class: 'card' }, h('h3', null, 'Successful logins (24h) and active sessions'),
           (sec.sessions || []).length > 0 && h('div', { style: 'margin-bottom:8px' }, sec.sessions.map((x) => h('div', { class: 'kv' }, h('span', { class: 'mono' }, `${x.user} (${x.tty})`), h('span', { class: 'muted small mono' }, `${x.from} · since ${x.since}`)))),
           ssh && ssh.accepted.length ? h('table', null, h('thead', null, h('tr', null, ['When', 'User', 'From', 'Method'].map((t) => h('th', null, t)))),
-            h('tbody', null, ssh.accepted.slice(0, 8).map((a) => h('tr', null, h('td', null, ago(a.t)), h('td', { class: 'mono' }, a.user), h('td', { class: 'mono' }, a.ip), h('td', null, chip(a.method, a.method === 'password' ? 'bad' : 'neutral')))))) : h('div', { class: 'empty' }, 'No successful logins in the last 24h.')),
+            h('tbody', null, ssh.accepted.slice(0, 8).map((a) => h('tr', null, h('td', null, ago(a.t)), h('td', { class: 'mono' }, a.user), h('td', { class: 'mono' }, a.ip), h('td', null, a.deploy ? chip('deploy (CI)', 'info') : chip(a.method, a.method === 'password' ? 'bad' : 'neutral')))))) : h('div', { class: 'empty' }, 'No successful logins in the last 24h.')),
         h('div', { class: 'card' }, h('h3', null, 'Listening ports, services, certificates'),
           h('div', { class: 'chips', style: 'margin-bottom:10px' }, (sec.ports || []).map((p) => chip(`${p.port} ${p.proc || ''} ${p.public ? '· public' : '· local'}`, p.public ? (p.allowed ? 'info' : 'bad') : 'neutral'))),
           h('div', { class: 'chips', style: 'margin-bottom:10px' }, (sec.services || []).map((x) => chip(`${x.name}: ${x.active}`, x.active === 'active' ? 'ok' : 'bad'))),

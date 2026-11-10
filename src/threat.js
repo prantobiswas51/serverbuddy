@@ -23,6 +23,7 @@ function evaluate(d, cfg) {
     }
   }
   for (const a of auth.accepted || []) {
+    if (a.deploy) continue; // the CI deploy key logging in from a GitHub runner: expected, not an alert
     const id = `login:${a.user}@${a.ip}`;
     const restricted = cfg.allowedLoginUsers.length && !cfg.allowedLoginUsers.includes(a.user);
     const sev = a.user === 'root' || a.method === 'password' || restricted ? 'critical' : 'high';

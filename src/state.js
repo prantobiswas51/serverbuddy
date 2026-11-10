@@ -30,7 +30,7 @@ class Monitor {
       this.collectors = {
         system: sys.create(),
         sec: sec.createSec(cfg),
-        auth: sec.createAuth(),
+        auth: sec.createAuth(cfg),
         web: web.create(cfg),
         pm2: pm2.create(),
         slow: this.slowCollector,

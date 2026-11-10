@@ -128,9 +128,17 @@ function create() {
     }
     const env = [`PM2_HOME=${path.join(u.home, '.pm2')}`, `HOME=${u.home}`, `PATH=${bin.binDir}:/usr/local/bin:/usr/bin:/bin`];
     const me = process.getuid ? process.getuid() : -1;
+    const envObj = Object.fromEntries(env.map((e) => e.split(/=(.*)/s).slice(0, 2)));
     let r;
-    if (me === 0) r = await run('runuser', ['-u', u.user, '--', 'env', ...env, bin.bin, 'jlist'], { timeout: 20000 });
-    else if (me === u.uid) r = await run(bin.bin, ['jlist'], { timeout: 20000, env: Object.fromEntries(env.map((e) => e.split(/=(.*)/s).slice(0, 2))) });
+    if (me === 0) {
+      r = await run('runuser', ['-u', u.user, '--', 'env', ...env, bin.bin, 'jlist'], { timeout: 20000 });
+      if (!r.ok && /runuser:|cannot set (user|group)|not permitted/i.test(r.err)) {
+        // Some hosts/sandboxes refuse the user switch. Root can talk to any user's PM2 daemon
+        // directly through that user's PM2_HOME socket, so fall back to that (read-only `jlist`).
+        r = await run(bin.bin, ['jlist'], { timeout: 20000, env: envObj });
+        res.note = '';
+      }
+    } else if (me === u.uid) r = await run(bin.bin, ['jlist'], { timeout: 20000, env: envObj });
     else { res.note = 'Run ServerBuddy as root to inspect other users'; return res; }
     const list = r.ok ? parseJlist(r.out) : null;
     if (!list) { res.note = `pm2 jlist failed: ${(r.err || r.out).trim().slice(0, 160)}`; return res; }

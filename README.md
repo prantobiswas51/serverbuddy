@@ -109,6 +109,7 @@ Run `certbot --nginx -d status.example.com`, then set `SB_TRUST_PROXY=1` in the 
 | `SB_NGINX_LOG` | `/var/log/nginx/access.log` | Access log to analyse |
 | `SB_WEBHOOK_URL` | empty | POST `{text, alert}` JSON on new critical/high alerts |
 | `SB_TRUST_PROXY` | `0` | Trust `X-Forwarded-*` (only behind your own nginx) |
+| `SB_DEPLOY_KEY_FPS` | auto | SHA256 fingerprint(s) of the CI deploy key. `install.sh` fills it in from `authorized_keys`; logins with it show as "deploy (CI)" and never raise new-login alerts |
 
 ## How multi-user PM2 works
 
