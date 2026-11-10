@@ -34,6 +34,16 @@ jobs:
           VPS_SSH_KEY: ${{ secrets.VPS_SSH_KEY }}
           VPS_HOST_KEY: ${{ secrets.VPS_HOST_KEY }}
         run: |
+          # Fail early with a clear message instead of a confusing SSH error later.
+          missing=""
+          [ -n "${VPS_SSH_KEY// }" ]  || missing="$missing VPS_SSH_KEY"
+          [ -n "${VPS_HOST_KEY// }" ] || missing="$missing VPS_HOST_KEY"
+          [ -n "${{ secrets.VPS_HOST }}" ] || missing="$missing VPS_HOST"
+          [ -n "${{ secrets.VPS_USER }}" ] || missing="$missing VPS_USER"
+          if [ -n "$missing" ]; then
+            echo "::error::Empty or missing repository secret(s):$missing (Settings > Secrets and variables > Actions)"
+            exit 1
+          fi
           install -m 700 -d ~/.ssh
           printf '%s\n' "$VPS_SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
