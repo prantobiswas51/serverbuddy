@@ -149,6 +149,7 @@ function create() {
       await scanErrLog(key, e.pm_err_log_path);
       res.apps.push({
         id: p.pm_id,
+        pid: p.pid || 0,
         name: p.name,
         status: e.status || 'unknown',
         restarts: e.restart_time || 0,

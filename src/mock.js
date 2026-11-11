@@ -46,6 +46,19 @@ function create() {
             { port: 3001, addr: '127.0.0.1', proc: 'next-server', public: false }, { port: 5432, addr: '127.0.0.1', proc: 'postgres', public: false },
             { port: 8080, addr: '0.0.0.0', proc: 'node', public: true },
           ],
+          listeners: [
+            { proto: 'tcp', port: 22, pid: 701, proc: 'sshd', addrs: ['0.0.0.0', '::'], public: true, user: 'root', service: 'ssh', cwd: '/', cmd: 'sshd: /usr/sbin/sshd -D', chain: [701, 1] },
+            { proto: 'tcp', port: 80, pid: 810, proc: 'nginx', addrs: ['0.0.0.0', '::'], public: true, user: 'root', service: 'nginx', cwd: '/', cmd: 'nginx: master process', chain: [810, 1] },
+            { proto: 'tcp', port: 443, pid: 810, proc: 'nginx', addrs: ['0.0.0.0', '::'], public: true, user: 'root', service: 'nginx', cwd: '/', cmd: 'nginx: master process', chain: [810, 1] },
+            { proto: 'tcp', port: 1883, pid: 981, proc: 'mosquitto', addrs: ['127.0.0.1'], public: false, user: 'mosquitto', service: 'mosquitto', cwd: '/', cmd: '/usr/sbin/mosquitto -c /etc/mosquitto/mosquitto.conf', chain: [981, 1] },
+            { proto: 'tcp', port: 3001, pid: 2211, proc: 'next-server (v1', addrs: ['127.0.0.1'], public: false, user: 'bongomaker', service: '', cwd: '/var/www/bongomaker/ecom/front', cmd: 'next-server (v16.4.3)', chain: [2211, 1190, 1] },
+            { proto: 'tcp', port: 3002, pid: 2290, proc: 'node', addrs: ['127.0.0.1'], public: false, user: 'bongomaker', service: '', cwd: '/var/www/bongomaker/control', cmd: 'node dist/main.js', chain: [2290, 1190, 1] },
+            { proto: 'tcp', port: 5432, pid: 2340, proc: 'postgres', addrs: ['127.0.0.1', '::1'], public: false, user: 'postgres', service: 'postgresql@18-main', cwd: '/var/lib/postgresql', cmd: '/usr/lib/postgresql/18/bin/postgres', chain: [2340, 1] },
+            { proto: 'tcp', port: 7070, pid: 744, proc: 'node', addrs: ['127.0.0.1'], public: false, user: 'root', service: 'serverbuddy', cwd: '/opt/serverbuddy', cmd: '/usr/bin/node /opt/serverbuddy/src/index.js', chain: [744, 1] },
+            { proto: 'tcp', port: 8080, pid: 3999, proc: 'node', addrs: ['0.0.0.0'], public: true, user: 'deploy', service: '', cwd: '/home/deploy/test', cmd: 'node server.js', chain: [3999, 3990, 1] },
+            { proto: 'udp', port: 68, pid: 612, proc: 'systemd-network', addrs: ['10.0.0.5%ens3'], public: true, user: 'systemd-network', service: 'systemd-networkd', cwd: '/', cmd: '/lib/systemd/systemd-networkd', chain: [612, 1] },
+            { proto: 'udp', port: 323, pid: 688, proc: 'chronyd', addrs: ['127.0.0.1'], public: false, user: '_chrony', service: 'chrony', cwd: '/', cmd: '/usr/sbin/chronyd', chain: [688, 1] },
+          ],
           firewall: { installed: true, active: true, rules: 4 },
           fail2ban: { active: true, banned: 3, totalBanned: 41, failed: 2, ips: ['45.135.232.10', '185.224.128.17', '91.92.241.5'] },
           sshd: { permitrootlogin: 'no', passwordauthentication: 'no', pubkeyauthentication: 'yes' },
@@ -98,9 +111,9 @@ function create() {
           users: [
             {
               user: 'bongomaker', home: '/home/bongomaker', daemon: true, note: '', apps: [
-                app(0, 'bmfront-prod', 'online'),
-                app(1, 'bmcontrol-api', 'online', { restarts: 4, errors: { m5, h1: m5, last: errList.slice(0, 5) } }),
-                app(2, 'bmcontrol-mqtt', 'errored', { restarts: 16, restarts10m: 5, errors: { m5: 12, h1: 40, last: [{ t: now - 20e3, msg: 'Error: connect ECONNREFUSED 127.0.0.1:1883' }] } }),
+                app(0, 'bmfront-prod', 'online', { pid: 2211 }),
+                app(1, 'bmcontrol-api', 'online', { pid: 2290, restarts: 4, errors: { m5, h1: m5, last: errList.slice(0, 5) } }),
+                app(2, 'bmcontrol-mqtt', 'errored', { pid: 0, restarts: 16, restarts10m: 5, errors: { m5: 12, h1: 40, last: [{ t: now - 20e3, msg: 'Error: connect ECONNREFUSED 127.0.0.1:1883' }] } }),
               ],
             },
             { user: 'deploy', home: '/home/deploy', daemon: false, note: 'PM2 daemon is not running, but 2 app(s) are saved. They will not serve traffic.', savedApps: 2, apps: [] },

@@ -10,6 +10,7 @@ Zero npm dependencies. Runs as a root systemd service so it can see all users' P
 | **System** | CPU, memory, swap, disks, network throughput, connections, top processes, 15 min history |
 | **SSH** | Failed attempts (10m / 1h / 24h), top attacker IPs and usernames, active brute force not yet banned, every successful login (new source = alert), live sessions |
 | **Posture** | `PermitRootLogin`, `PasswordAuthentication`, ufw, fail2ban (+ banned IPs), unexpected public ports, service status, TLS cert expiry, pending security updates, reboot-required |
+| **Ports** | Every listening TCP/UDP port with the app behind it: PM2 app (matched by process id or a parent's), systemd service, or "unmanaged" (a process started by hand). Shows owner, user, working folder, and whether it is reachable from the internet or only from localhost |
 | **Integrity** | SHA-256 baseline of `/etc/passwd`, `shadow`, `sudoers(.d)`, `sshd_config`, cron, `ld.so.preload`, every `authorized_keys`. Extra UID 0 accounts |
 | **Web** | nginx access log: requests, 4xx/5xx, scanner probes (`.env`, `wp-login`, `phpmyadmin`...), top scanner IPs |
 | **PM2** | Every user with a `~/.pm2`: status, restarts and crash loops, CPU/memory, **new error lines from each app's error log**, "daemon down but apps saved" (e.g. after a reboot without `pm2 startup`) |
@@ -87,8 +88,10 @@ server {
     location / {
         proxy_pass http://127.0.0.1:7070;
         proxy_http_version 1.1;
+        proxy_set_header Connection "";
         proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        # OVERWRITE (not append) so a visitor cannot fake their IP and dodge the login rate limit:
+        proxy_set_header X-Forwarded-For $remote_addr;
         proxy_set_header X-Forwarded-Proto $scheme;
         proxy_buffering off;          # needed for the live stream (SSE)
         proxy_read_timeout 1h;

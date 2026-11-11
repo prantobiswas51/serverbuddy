@@ -197,6 +197,44 @@
           u.apps.map((a) => appRow(u, a))))));
   }
 
+  // ---- ports: which app/service owns each listening port ----------------------------
+  function portsPanel(s) {
+    const L = s.security.listeners;
+    if (!L) return null;
+    const tcp = L.filter((l) => l.proto === 'tcp').sort((a, b) => (b.public - a.public) || a.port - b.port);
+    const udp = L.filter((l) => l.proto === 'udp').sort((a, b) => (b.public - a.public) || a.port - b.port);
+    const unmanaged = tcp.filter((l) => !l.app && !l.service).length;
+    const unexpected = tcp.filter((l) => !l.allowed).length;
+
+    const owner = (l) => {
+      if (l.app) return h('div', null, chip(`PM2 · ${l.app.name}`, l.app.status === 'online' ? 'ok' : 'bad'), h('div', { class: 'muted small' }, `run by ${l.app.user}`));
+      if (l.service) return chip(`service · ${l.service}`, 'info');
+      return h('div', null, chip('unmanaged', 'warn'), h('div', { class: 'muted small' }, 'not PM2, not a systemd service'));
+    };
+    const reach = (l) => h('span', { title: l.addrs.join(', ') }, l.public ? chip(l.allowed ? 'public' : 'public: not allowed', l.allowed ? 'info' : 'bad') : chip('localhost only', 'neutral'));
+    const dir = (l) => h('span', { class: 'mono small muted', title: l.cmd || '' }, l.cwd && l.cwd !== '/' ? l.cwd : '-');
+    const proc = (l) => h('span', { class: 'mono' }, l.proc || '?', h('span', { class: 'muted small' }, l.pid ? `  pid ${l.pid}` : ''));
+
+    return h('section', { class: 'section' }, h('h2', null, 'Ports and the apps behind them'),
+      h('div', { class: 'card' },
+        h('div', { class: 'stats' },
+          h('div', null, h('b', null, tcp.length), h('span', null, 'listening (TCP)')),
+          h('div', null, h('b', null, tcp.filter((l) => l.public).length), h('span', null, 'open to internet')),
+          h('div', null, h('b', null, tcp.filter((l) => !l.public).length), h('span', null, 'localhost only')),
+          h('div', null, h('b', { style: unmanaged ? 'color:var(--medium)' : '' }, unmanaged), h('span', null, 'unmanaged')),
+          h('div', null, h('b', { style: unexpected ? 'color:var(--critical)' : '' }, unexpected), h('span', null, 'unexpected public'))),
+        tcp.length ? h('div', { class: 'tablewrap' }, h('table', null,
+          h('thead', null, h('tr', null, ['Port', 'Reachable from', 'App / service', 'Process', 'User', 'Folder'].map((t, i) => h('th', { class: i === 5 ? 'hide-sm' : '' }, t)))),
+          h('tbody', null, tcp.map((l) => h('tr', null,
+            h('td', { class: 'mono' }, h('b', null, l.port), h('span', { class: 'muted small' }, '/tcp')), h('td', null, reach(l)), h('td', null, owner(l)),
+            h('td', null, proc(l)), h('td', null, l.user), h('td', { class: 'hide-sm' }, dir(l))))))) : h('div', { class: 'empty' }, 'No listening TCP ports found.'),
+        h('div', { class: 'muted small', style: 'margin-top:8px' }, 'Localhost-only ports (like your Node apps) are reachable from the internet only through nginx. "Folder" is the process\'s working directory; hover it for the full command.'),
+        udp.length > 0 && h('details', { style: 'margin-top:10px' }, h('summary', { class: 'muted small', style: 'cursor:pointer' }, `UDP listeners (${udp.length})`),
+          h('div', { class: 'tablewrap' }, h('table', null,
+            h('thead', null, h('tr', null, ['Port', 'Reachable from', 'Process', 'User'].map((t) => h('th', null, t)))),
+            h('tbody', null, udp.map((l) => h('tr', null, h('td', { class: 'mono' }, h('b', null, l.port), h('span', { class: 'muted small' }, '/udp')), h('td', null, reach(l)), h('td', null, proc(l)), h('td', null, l.user)))))))));
+  }
+
   const check = (label, ok, detail) => h('div', { class: 'kv' }, h('span', null, label), h('span', null, detail && h('span', { class: 'muted small' }, `${detail}  `), chip(ok === 'n/a' ? 'n/a' : ok ? 'ok' : 'risk', ok === 'n/a' ? 'neutral' : ok ? 'ok' : 'bad')));
 
   function securityPanel(s, cfgPorts) {
@@ -230,8 +268,7 @@
           (sec.sessions || []).length > 0 && h('div', { style: 'margin-bottom:8px' }, sec.sessions.map((x) => h('div', { class: 'kv' }, h('span', { class: 'mono' }, `${x.user} (${x.tty})`), h('span', { class: 'muted small mono' }, `${x.from} · since ${x.since}`)))),
           ssh && ssh.accepted.length ? h('table', null, h('thead', null, h('tr', null, ['When', 'User', 'From', 'Method'].map((t) => h('th', null, t)))),
             h('tbody', null, ssh.accepted.slice(0, 8).map((a) => h('tr', null, h('td', null, ago(a.t)), h('td', { class: 'mono' }, a.user), h('td', { class: 'mono' }, a.ip), h('td', null, a.deploy ? chip('deploy (CI)', 'info') : chip(a.method, a.method === 'password' ? 'bad' : 'neutral')))))) : h('div', { class: 'empty' }, 'No successful logins in the last 24h.')),
-        h('div', { class: 'card' }, h('h3', null, 'Listening ports, services, certificates'),
-          h('div', { class: 'chips', style: 'margin-bottom:10px' }, (sec.ports || []).map((p) => chip(`${p.port} ${p.proc || ''} ${p.public ? '· public' : '· local'}`, p.public ? (p.allowed ? 'info' : 'bad') : 'neutral'))),
+        h('div', { class: 'card' }, h('h3', null, 'Services and certificates'),
           h('div', { class: 'chips', style: 'margin-bottom:10px' }, (sec.services || []).map((x) => chip(`${x.name}: ${x.active}`, x.active === 'active' ? 'ok' : 'bad'))),
           (sec.certs || []).map((c) => h('div', { class: 'kv' }, h('span', { class: 'mono' }, c.name), chip(`${c.daysLeft} days left`, c.daysLeft < 7 ? 'bad' : c.daysLeft < 21 ? 'warn' : 'ok'))),
           sec.users && sec.users.sudoers && sec.users.sudoers.length > 0 && kv('Sudo users', sec.users.sudoers.join(', ')))));
@@ -262,7 +299,7 @@
     const y = state.security;
     // The server marks which listening ports are allowed by policy.
     const frag = document.createDocumentFragment();
-    frag.append(header(state), banner(state), alertsPanel(state), systemPanel(state), pm2Panel(state), securityPanel(state, y), webPanel(state) || '', eventsPanel(state));
+    frag.append(header(state), banner(state), alertsPanel(state), systemPanel(state), pm2Panel(state), portsPanel(state) || '', securityPanel(state, y), webPanel(state) || '', eventsPanel(state));
     root.replaceChildren(frag);
   }
 

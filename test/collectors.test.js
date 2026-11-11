@@ -143,6 +143,45 @@ test('diffBaseline finds added, modified, removed and flags critical files', () 
   assert.equal(by['/etc/hosts'], undefined);
 });
 
+// ------------------------------------------------------------------ ports -----
+const ports = require('../src/collectors/ports');
+
+test('parseListeners: one row per process, merges IPv4+IPv6, picks the master pid, flags public', () => {
+  const tcp = [
+    'LISTEN 0 4096 0.0.0.0:22 0.0.0.0:* users:(("sshd",pid=701,fd=3))',
+    'LISTEN 0 4096 [::]:22 [::]:* users:(("sshd",pid=701,fd=4))',
+    'LISTEN 0 511 0.0.0.0:80 0.0.0.0:* users:(("nginx",pid=905,fd=6),("nginx",pid=904,fd=6),("nginx",pid=810,fd=6))',
+    'LISTEN 0 511 127.0.0.1:3001 0.0.0.0:* users:(("next-server (v1",pid=2211,fd=20))',
+    'LISTEN 0 4096 127.0.0.53%lo:53 0.0.0.0:*',
+  ].join('\n');
+  const rows = ports.parseListeners(tcp, 'tcp');
+  assert.deepEqual(rows.map((r) => [r.port, r.pid, r.public]), [[22, 701, true], [53, 0, false], [80, 810, true], [3001, 2211, false]]);
+  assert.deepEqual(rows[0].addrs, ['0.0.0.0', '::']);
+  assert.equal(rows.find((r) => r.port === 3001).proc, 'next-server (v1');
+  const udp = ports.parseListeners('UNCONN 0 0 10.0.0.5%ens3:68 0.0.0.0:* users:(("systemd-network",pid=612,fd=11))\nLISTEN 0 1 0.0.0.0:9 0.0.0.0:*', 'udp');
+  assert.equal(udp.length, 1);
+  assert.equal(udp[0].public, true);
+});
+
+test('serviceFromCgroup finds the systemd service, ignores user manager units', () => {
+  assert.equal(ports.serviceFromCgroup('0::/system.slice/nginx.service\n'), 'nginx');
+  assert.equal(ports.serviceFromCgroup('0::/system.slice/system-postgresql.slice/postgresql@18-main.service\n'), 'postgresql@18-main');
+  assert.equal(ports.serviceFromCgroup('0::/user.slice/user-1000.slice/user@1000.service/app.slice/a.service\n'), 'a');
+  assert.equal(ports.serviceFromCgroup('0::/user.slice/user-1000.slice/user@1000.service\n'), '');
+  assert.equal(ports.serviceFromCgroup('0::/user.slice/user-1000.slice/session-3.scope\n'), '');
+});
+
+test('attachApps matches a PM2 app by the listening pid or any parent', () => {
+  const pm2 = { users: [{ user: 'bongomaker', apps: [{ name: 'front', pid: 2211, status: 'online' }, { name: 'api', pid: 1190, status: 'online' }, { name: 'dead', pid: 0, status: 'errored' }] }] };
+  const out = ports.attachApps([
+    { port: 3001, pid: 2211, chain: [2211, 1190, 1] },   // listener is the app itself (front wins over its parent)
+    { port: 3002, pid: 2290, chain: [2290, 1190, 1] },   // npm-start style: parent is the PM2 app
+    { port: 80, pid: 810, chain: [810, 1] },             // nginx: not PM2
+  ], pm2);
+  assert.deepEqual(out.map((l) => l.app && l.app.name), ['front', 'api', null]);
+  assert.equal(out[0].app.user, 'bongomaker');
+});
+
 // ------------------------------------------------------------------ nginx -----
 const NGX = [
   '1.2.3.4 - - [08/Nov/2026:14:00:00 +0600] "GET /.env HTTP/1.1" 404 153 "-" "curl/8"',

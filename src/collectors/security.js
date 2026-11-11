@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { run, readText, isLinux } = require('../util');
+const portsMod = require('./ports');
 
 // ============================================================================
 // Pure parsers (unit-tested)
@@ -211,16 +212,22 @@ function createSec(cfg) {
   return {
     async collect() {
       if (!isLinux) return { ports: [], firewall: {}, fail2ban: null, sshd: {}, sessions: [], services: [] };
-      const [ss, ufw, f2b, sshd, who, sc] = await Promise.all([
+      const [ss, ssu, ufw, f2b, sshd, who, sc] = await Promise.all([
         run('ss', ['-tlnpH']),
+        run('ss', ['-ulnpH']),
         run('ufw', ['status']),
         run('fail2ban-client', ['status', 'sshd']),
         run('sshd', ['-T']),
         run('who', ['-u']),
         run('systemctl', ['show', ...cfg.services, '-p', 'LoadState', '-p', 'ActiveState', '-p', 'SubState', '--no-pager']),
       ]);
+      // Who owns each listening port: process, user, systemd service, working directory.
+      const users = new Map(parsePasswd(readText('/etc/passwd')).map((u) => [u.uid, u.name]));
+      const listeners = [...portsMod.parseListeners(ss.out, 'tcp'), ...portsMod.parseListeners(ssu.out, 'udp')]
+        .map((r) => ({ ...r, ...portsMod.describe(r.pid, users) }));
       return {
         ports: parseSs(ss.out),
+        listeners,
         firewall: ufw.ok ? parseUfw(ufw.out) : { installed: false, active: false, rules: 0 },
         fail2ban: f2b.ok ? { active: true, ...parseFail2ban(f2b.out) } : { active: false, banned: 0, totalBanned: 0, ips: [] },
         sshd: parseSshdT(sshd.out),

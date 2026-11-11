@@ -127,6 +127,15 @@ test('Monitor (mock): builds a snapshot and acknowledging a login alert hides it
     const s = m.snapshot;
     assert.ok(s.system && s.pm2 && s.security.ssh);
     assert.equal(s.security.ports.find((p) => p.port === 8080).allowed, false);
+    const L = s.security.listeners;
+    const by = (port) => L.find((l) => l.port === port && l.proto === 'tcp');
+    assert.equal(by(3001).app.name, 'bmfront-prod');      // matched to PM2 by pid
+    assert.equal(by(3002).app.name, 'bmcontrol-api');     // matched through the parent process
+    assert.equal(by(80).app, null);                       // nginx is a systemd service, not PM2
+    assert.equal(by(80).service, 'nginx');
+    assert.equal(by(8080).allowed, false);                // public, not in the allowed list
+    assert.equal(by(8080).app || by(8080).service || '', ''); // an unmanaged process
+    assert.ok(L.every((l) => !('chain' in l)));           // internal field is not sent to the browser
     const login = s.alerts.find((a) => a.id.startsWith('login:'));
     assert.ok(login && !login.acked);
     assert.equal(m.ack(login.id), true);

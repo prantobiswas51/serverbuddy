@@ -2,6 +2,7 @@
 const os = require('os');
 const { Store } = require('./store');
 const { evaluate, summarize } = require('./threat');
+const { attachApps } = require('./collectors/ports');
 
 const HISTORY_POINTS = 300; // 15 min at 3 s
 
@@ -104,6 +105,11 @@ class Monitor {
       security: {
         ...(d.sec || {}),
         ports: ((d.sec && d.sec.ports) || []).map((p) => ({ ...p, allowed: !p.public || this.cfg.allowedPorts.includes(p.port) })),
+        // Every listening socket with its owner; PM2 apps are matched by process id (or a parent's).
+        listeners: attachApps((d.sec && d.sec.listeners) || [], d.pm2).map(({ chain, ...l }) => ({
+          ...l,
+          allowed: l.proto === 'udp' || !l.public || this.cfg.allowedPorts.includes(l.port),
+        })),
         ssh: d.auth || null,
         ...(slow || {}),
       },
